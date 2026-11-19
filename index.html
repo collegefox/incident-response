@@ -1,0 +1,856 @@
+<!doctype html>
+<html lang="ar" dir="rtl" data-theme="dark">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>ميدان الاستجابة</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans+Arabic:wght@400;500;600;700&display=swap">
+<style>
+/* Layout: case rail on the reading side listing five levels, one working stage beside it that swaps between briefing, live simulation and debrief. */
+/* Theme: dark pentest-lab console (terminal prompt, window-chrome panels, faint grid, cyan glow). Light variant behind the toggle. */
+:root{
+  --bg:#0A0E13; --surface:#0F151C; --surface2:#141C25; --ink:#D7E2EC; --muted:#7F92A4; --line:#1E2B37;
+  --accent:#2BC4F0; --accent-ink:#03141C; --accent-soft:#0E2A38; --on-solid:#04101A;
+  --ok:#3DDC97; --ok-soft:#0F2E22; --warn:#F2B84B; --warn-soft:#33270E; --bad:#FF6B6B; --bad-soft:#3A1717;
+  --grid:rgba(43,196,240,.05); --glow:rgba(43,196,240,.35);
+  --font:'IBM Plex Sans Arabic',system-ui,'Segoe UI',Tahoma,sans-serif;
+  --mono:'IBM Plex Mono',ui-monospace,Menlo,Consolas,monospace;
+  color-scheme:dark;
+}
+:root[data-theme="light"]{
+  --bg:#EDF0F3; --surface:#FFFFFF; --surface2:#F4F6F8; --ink:#14202B; --muted:#566676; --line:#D3DAE1;
+  --accent:#0A6C96; --accent-ink:#FFFFFF; --accent-soft:#DCEEF6; --on-solid:#FFFFFF;
+  --ok:#1B7F53; --ok-soft:#DDF1E7; --warn:#946004; --warn-soft:#FBEBCB; --bad:#B3321F; --bad-soft:#F9DDD7;
+  --grid:rgba(10,108,150,.06); --glow:rgba(10,108,150,.25);
+  color-scheme:light;
+}
+*{box-sizing:border-box}
+body{margin:0}
+body{background:var(--bg);color:var(--ink);font-family:var(--font);font-size:15px;line-height:1.7}
+.app{max-width:1180px;margin:0 auto;padding-block:20px 40px;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
+h1,h2,h3,p,ul{margin:0}
+h1{font-size:28px;line-height:1.25;font-weight:700}
+h2{font-size:21px;line-height:1.4;font-weight:600;text-wrap:balance}
+h3{font-size:16px;font-weight:600}
+ul{padding-inline-start:20px;display:flex;flex-direction:column;gap:4px}
+.kicker{font-size:12px;letter-spacing:.06em;color:var(--muted);font-weight:500}
+.mono{font-family:var(--mono)}
+.muted{color:var(--muted)}
+.small{font-size:13px}
+.col{display:flex;flex-direction:column;gap:16px;min-width:0}
+.row{display:flex;gap:10px;flex-wrap:wrap;align-items:center}
+.top{display:flex;justify-content:space-between;align-items:flex-end;gap:16px;flex-wrap:wrap;padding-bottom:18px;border-bottom:1px solid var(--line);margin-bottom:20px}
+.score{display:flex;align-items:baseline;gap:8px;color:var(--muted)}
+.score b{font-size:30px;color:var(--ink);font-weight:500;line-height:1}
+.shell{display:grid;grid-template-columns:268px minmax(0,1fr);gap:20px;align-items:start}
+.rail{display:flex;flex-direction:column;gap:8px;min-width:0}
+.lv{display:grid;grid-template-columns:auto minmax(0,1fr);gap:12px;align-items:center;text-align:start;font:inherit;color:inherit;background:var(--surface);border:1px solid var(--line);border-radius:8px;padding:12px 14px;cursor:pointer}
+.lv:hover{border-color:var(--accent)}
+.lv[aria-current="true"]{background:var(--accent-soft);border-color:var(--accent)}
+.lv .n{font-family:var(--mono);color:var(--accent);font-weight:500;font-size:18px}
+.lv b{font-weight:600;display:block;line-height:1.4}
+.lv .sub{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-top:4px;font-size:12px;color:var(--muted)}
+.chip{font-size:12px;padding:1px 9px;border-radius:999px;font-weight:500;border:1px solid currentColor;white-space:nowrap}
+.chip.ok{background:var(--ok-soft);color:var(--ok)}
+.chip.warn{background:var(--warn-soft);color:var(--warn)}
+.chip.bad{background:var(--bad-soft);color:var(--bad)}
+.chip.neutral{background:var(--surface2);color:var(--muted)}
+.stage{display:flex;flex-direction:column;gap:16px;min-width:0}
+.card{background:var(--surface);border:1px solid var(--line);border-radius:8px;padding:22px;display:flex;flex-direction:column;gap:14px;min-width:0}
+.bar{display:flex;justify-content:space-between;align-items:flex-end;gap:12px;flex-wrap:wrap}
+.timebox{display:flex;flex-direction:column;align-items:flex-end;color:var(--muted);font-size:12px}
+.clock{font-family:var(--mono);font-size:32px;font-weight:500;line-height:1.1;direction:ltr;color:var(--ink)}
+.clock.low{color:var(--bad)}
+.prog{color:var(--muted);font-size:13px}
+.btn{font:inherit;font-weight:600;background:var(--accent);color:var(--accent-ink);border:0;border-radius:6px;padding:10px 18px;cursor:pointer}
+.btn:hover{filter:brightness(1.08)}
+.btn.ghost{background:transparent;color:var(--ink);border:1px solid var(--line)}
+.btn.bad{background:var(--bad);color:var(--on-solid)}
+.btn.ok{background:var(--ok);color:var(--on-solid)}
+.btn[disabled]{opacity:.5;cursor:not-allowed}
+:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.how{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:12px}
+.how div{background:var(--surface2);border:1px solid var(--line);border-radius:8px;padding:14px;display:flex;flex-direction:column;gap:4px}
+/* email */
+.email{background:var(--surface2);border:1px solid var(--line);border-radius:8px;padding:18px;display:flex;flex-direction:column;gap:10px}
+.meta{display:flex;gap:10px;align-items:baseline;flex-wrap:wrap;border-bottom:1px solid var(--line);padding-bottom:8px}
+.meta .k{color:var(--muted);font-size:13px;min-width:64px}
+.body{display:flex;flex-direction:column;gap:10px}
+.hot{font:inherit;color:inherit;background:none;border:1px dashed var(--muted);border-radius:4px;padding:0 6px;cursor:pointer;text-align:start}
+.hot:hover{border-color:var(--accent);background:var(--accent-soft)}
+.hot.on{background:var(--warn-soft);border:1px solid var(--warn)}
+.hot.miss{border:2px solid var(--bad);background:var(--bad-soft)}
+.hot.fp{border:2px solid var(--warn);background:var(--warn-soft);text-decoration:line-through}
+.hot.hit{border:2px solid var(--ok);background:var(--ok-soft)}
+.real{font-size:12px;color:var(--muted);direction:ltr;text-align:right}
+/* feedback */
+.fb{border:1px solid var(--line);border-radius:8px;padding:14px 16px;background:var(--surface2);display:flex;flex-direction:column;gap:8px}
+.fb.good{border-color:var(--ok);background:var(--ok-soft)}
+.fb.bad{border-color:var(--bad);background:var(--bad-soft)}
+.fb.mid{border-color:var(--warn);background:var(--warn-soft)}
+.st{font-size:12px;font-weight:600;padding:0 7px;border-radius:4px;margin-inline-end:6px;border:1px solid currentColor;white-space:nowrap}
+.st.hit{color:var(--ok)} .st.miss{color:var(--bad)} .st.fp{color:var(--warn)} .st.neutral{color:var(--muted)}
+.event{background:var(--bad-soft);border:1px solid var(--bad);border-radius:8px;padding:12px 14px}
+/* tables */
+.tw{overflow-x:auto;border:1px solid var(--line);border-radius:8px}
+table.log{border-collapse:collapse;width:100%;min-width:700px;font-size:13px}
+.log th,.log td{padding:8px 10px;text-align:start;border-bottom:1px solid var(--line);vertical-align:top}
+.log th{background:var(--surface2);font-weight:600;color:var(--muted);font-size:12px}
+.log td.m{font-family:var(--mono);direction:ltr;text-align:left;unicode-bidi:isolate}
+.log tbody tr{cursor:pointer}
+.log.static tbody tr{cursor:default}
+.log tr.sel{background:var(--accent-soft)}
+.log tr.hit{background:var(--ok-soft)}
+.log tr.miss{background:var(--bad-soft)}
+.log tr.fp{background:var(--warn-soft)}
+.log .note{font-size:12.5px;min-width:200px}
+.tabs{display:flex;gap:6px;flex-wrap:wrap}
+.tab{font:inherit;background:var(--surface);border:1px solid var(--line);border-radius:6px;padding:6px 12px;cursor:pointer;color:var(--ink)}
+.tab[aria-selected="true"]{background:var(--accent);color:var(--accent-ink);border-color:var(--accent)}
+.ev{margin:0;font-family:var(--mono);font-size:12.5px;direction:ltr;text-align:left;background:var(--surface2);border:1px solid var(--line);border-radius:8px;padding:12px;overflow-x:auto;white-space:pre;line-height:1.9}
+/* options */
+.opts{display:flex;flex-direction:column;gap:8px}
+.opt{font:inherit;color:inherit;text-align:start;background:var(--surface);border:1px solid var(--line);border-radius:6px;padding:10px 14px;cursor:pointer;display:flex;flex-direction:column;gap:2px}
+.opt:hover:not([disabled]){border-color:var(--accent)}
+.opt.sel{border-color:var(--accent);background:var(--accent-soft)}
+.opt.hit{border-color:var(--ok);background:var(--ok-soft)}
+.opt.mid{border-color:var(--warn);background:var(--warn-soft)}
+.opt.miss{border-color:var(--bad);background:var(--bad-soft)}
+.opt.fp{border-color:var(--warn);background:var(--warn-soft)}
+.opt[disabled]{cursor:default}
+.opt .why{font-size:12.5px;color:var(--muted)}
+.qblock{display:flex;flex-direction:column;gap:8px;padding-top:12px;border-top:1px solid var(--line)}
+/* meters, roles */
+.meters{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:12px}
+.meter{background:var(--surface);border:1px solid var(--line);border-radius:8px;padding:12px 14px;display:flex;flex-direction:column;gap:6px}
+.meter small{color:var(--muted)}
+.meter b{font-family:var(--mono);font-size:22px;font-weight:500;direction:ltr;text-align:right}
+.track{height:8px;border-radius:4px;background:var(--surface2);overflow:hidden;border:1px solid var(--line)}
+.fill{height:100%;background:var(--bad);width:0;transition:width .3s}
+.roles{display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:12px}
+.role{background:var(--surface);border:1px solid var(--line);border-radius:8px;padding:14px;display:flex;flex-direction:column;gap:10px;min-width:0}
+.feed{list-style:none;padding:0;font-size:13px;display:flex;flex-direction:column;gap:6px}
+/* result */
+.big{display:flex;align-items:baseline;gap:12px;flex-wrap:wrap}
+.big b{font-size:56px;line-height:1;font-family:var(--mono);font-weight:500}
+/* lab theme */
+body{background-image:linear-gradient(var(--grid) 1px,transparent 1px),linear-gradient(90deg,var(--grid) 1px,transparent 1px);background-size:32px 32px}
+.kicker{font-family:var(--mono);color:var(--accent)}
+.kicker::before{content:'> ';color:var(--ok)}
+.top .kicker::before{content:''}
+.cur{display:inline-block;width:8px;height:1em;background:var(--accent);margin-inline-start:4px;vertical-align:-2px;animation:blink 1s steps(2,start) infinite}
+@keyframes blink{to{visibility:hidden}}
+.score b{color:var(--accent);text-shadow:0 0 14px var(--glow)}
+.card{position:relative;padding-top:42px;border-radius:6px;box-shadow:0 14px 34px -22px var(--glow)}
+.card::before{content:'';position:absolute;top:15px;left:16px;width:9px;height:9px;border-radius:50%;background:var(--bad);box-shadow:16px 0 0 var(--warn),32px 0 0 var(--ok)}
+.lv{border-radius:6px}
+.lv[aria-current="true"]{box-shadow:0 0 0 1px var(--accent),0 0 18px -6px var(--glow)}
+.clock{text-shadow:0 0 12px var(--glow)}
+.clock.low{text-shadow:0 0 12px var(--bad)}
+.btn{border-radius:4px;box-shadow:0 0 16px -6px var(--glow)}
+.btn.sm{padding:6px 12px;font-size:13px}
+.ev{color:var(--ok)}
+.top .row{gap:16px}
+/* animated scenes */
+.scene{border:1px solid var(--line);border-radius:6px;background:var(--surface2);overflow:hidden}
+.scene svg{display:block;width:100%;height:auto;max-height:180px;direction:ltr}
+.scene .tb{height:3px;background:var(--accent);width:calc(var(--t,1)*100%);box-shadow:0 0 10px var(--glow)}
+.scene.low .tb{background:var(--bad);box-shadow:0 0 10px var(--bad)}
+.scene *{animation-play-state:paused}
+.scene.run *{animation-play-state:running}
+.sc-link{stroke:var(--line);stroke-width:2;stroke-dasharray:4 6;fill:none}
+.sc-ring{fill:none;stroke:var(--line);stroke-width:1.5}
+.sc-node{fill:var(--surface);stroke:var(--line);stroke-width:2}
+.sc-node.bad{stroke:var(--bad)}
+.sc-node.acc{stroke:var(--accent)}
+.sc-t{fill:var(--muted);font:14px var(--mono)}
+.sc-bar{fill:var(--line)}
+.sc-bar.hl{fill:var(--accent)}
+.sc-dot{fill:var(--bad)}
+.sc-dot.warn{fill:var(--warn)}
+.sc-dot.ok{fill:var(--ok)}
+.env{fill:var(--surface);stroke:var(--accent);stroke-width:1.5}
+.envf{fill:none;stroke:var(--accent);stroke-width:1.5}
+.env.bad,.envf.bad{stroke:var(--bad)}
+.trav{animation:trav 4.2s linear infinite}
+@keyframes trav{0%{transform:translate(0,0);opacity:0}10%{opacity:1}90%{opacity:1}100%{transform:translate(var(--dx,0px),var(--dy,0px));opacity:0}}
+.ring{fill:none;stroke:var(--bad);stroke-width:2;transform-box:fill-box;transform-origin:center;animation:ring 2.4s ease-out infinite}
+@keyframes ring{from{transform:scale(.4);opacity:.9}to{transform:scale(1.8);opacity:0}}
+.flash{animation:flash 1.6s ease-in-out infinite}
+@keyframes flash{50%{opacity:.2}}
+.scan{fill:var(--accent);animation:scan 6s ease-in-out infinite alternate}
+@keyframes scan{from{transform:translateX(0)}to{transform:translateX(620px)}}
+.cell{fill:var(--ok);opacity:.8;animation:infect 9s linear infinite;animation-delay:calc(var(--i)*.28s)}
+@keyframes infect{0%,10%{fill:var(--ok)}20%,85%{fill:var(--bad)}100%{fill:var(--ok)}}
+.spin{animation:spin 4s linear infinite}
+@keyframes spin{to{transform:rotate(360deg)}}
+.blip{fill:var(--bad);animation:flash 2s ease-in-out infinite}
+@media (prefers-reduced-motion:reduce){.scene *{animation:none!important}}
+@media (max-width:860px){
+  .shell{grid-template-columns:minmax(0,1fr)}
+  .rail{flex-direction:row;overflow-x:auto;padding-bottom:4px}
+  .lv{min-width:210px}
+  h1{font-size:24px}
+  .card{padding:16px;padding-top:40px}
+  .big b{font-size:44px}
+}
+@media (prefers-reduced-motion:reduce){.fill{transition:none}.cur{animation:none}}
+</style>
+
+</head>
+<body>
+<div class="app" dir="rtl" lang="ar">
+  <header class="top">
+    <div>
+      <p class="kicker mono" dir="ltr">root@arena:~# ./incident-response<span class="cur"></span></p>
+      <h1>ميدان الاستجابة</h1>
+    </div>
+    <div class="row"><div class="score"><small>مجموع النقاط</small><b id="total" class="mono">0</b><span class="mono">/ 550</span></div><button type="button" id="themeBtn" class="btn ghost sm"></button></div>
+  </header>
+  <div class="shell">
+    <nav class="rail" id="rail" aria-label="المستويات"></nav>
+    <main id="stage" class="stage"></main>
+  </div>
+</div>
+
+<script>
+(()=>{
+const KEY='incident-arena-v1';
+let saved={};
+try{saved=JSON.parse(localStorage.getItem(KEY)||'{}')||{}}catch(e){saved={}}
+const persist=()=>{try{localStorage.setItem(KEY,JSON.stringify(saved))}catch(e){}};
+const $=s=>document.querySelector(s);
+const h=(t,a,...c)=>{
+  const e=document.createElement(t);
+  if(a)for(const k in a){
+    const v=a[k];
+    if(k==='class')e.className=v;
+    else if(k.slice(0,2)==='on')e.addEventListener(k.slice(2),v);
+    else if(v===true)e.setAttribute(k,'');
+    else if(v!==false&&v!=null)e.setAttribute(k,v);
+  }
+  for(const x of c.flat(Infinity)){
+    if(x==null||x===false)continue;
+    e.append(x.nodeType?x:document.createTextNode(String(x)));
+  }
+  return e;
+};
+const shuffle=a=>{a=[...a];for(let i=a.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[a[i],a[j]]=[a[j],a[i]]}return a};
+const fmt=s=>String(Math.floor(s/60)).padStart(2,'0')+':'+String(s%60).padStart(2,'0');
+const rate=a=>a>=90?{t:'خبير استجابة',tone:'ok'}:a>=75?{t:'محترف',tone:'ok'}:a>=55?{t:'متمرّس',tone:'warn'}:{t:'يحتاج تدريبًا',tone:'bad'};
+
+/* ---------- level data ---------- */
+const LV=[
+ {id:1,name:'اكتشاف التصيد',en:'Phishing Detection',tag:'مبتدئ',tone:'ok',time:240,run:L1,
+  mission:'وصلت إلى صندوق بريد الأمن ثلاث رسائل أبلغ عنها موظفون. افحص كل رسالة، علّم العناصر المشبوهة داخلها، ثم احكم: تصيّد أم رسالة سليمة.',
+  goals:['رصد مؤشرات التصيّد: النطاق والاستعجال والروابط والمرفقات','عدم اتهام الرسائل السليمة، فالبلاغ الكاذب يعطّل العمل','التمييز بين التصيّد العادي والاحتيال على المدير المالي'],
+  lessons:['افحص النطاق الفعلي للمرسل لا الاسم الظاهر.','الاستعجال والسرية وتجاوز الإجراءات علامات تلاعب نفسي.','مرّر المؤشر على الرابط قبل الضغط، ثم أبلغ فريق الأمن.']},
+ {id:2,name:'حادث شبكة',en:'Network Incident',tag:'متوسط',tone:'warn',time:300,run:L2,
+  mission:'أطلق نظام المراقبة عشرة أحداث شبكية خلال نصف ساعة. حدّد الأحداث الخبيثة، ثم اختر إجراءات الاستجابة الصحيحة.',
+  goals:['فصل الحركة الاعتيادية عن الهجوم','ربط الأحداث: تخمين ثم دخول ثم مسح ثم إشارة تحكم ثم تسريب','اختيار إجراءات تحتوي الحادث وتحفظ الأدلة'],
+  lessons:['اربط الأحداث ببعضها بدل تقييم كل تنبيه وحده.','احتوِ أولًا، واحفظ الأدلة قبل أي إصلاح.','الحركة الكبيرة ليست خبيثة دائمًا: اعرف خط الأساس لشبكتك.']},
+ {id:3,name:'التحقيق الجنائي الرقمي',en:'Digital Forensics',tag:'متوسط',tone:'warn',time:420,run:L3,
+  mission:'يُشتبه بتسريب بيانات مالية من حاسوب الموظفة سلمى (WS-114). أمامك أربعة مصادر أدلة. أجب عن الأسئلة، ثم اختر ما يجوز إدراجه في تقرير الحادث.',
+  goals:['قراءة السجلات وربطها زمنيًا لتحديد نقطة الدخول','التفريق بين ما يثبته الدليل وما هو تخمين','صياغة تقرير يقوم على الحقائق فقط'],
+  lessons:['الدليل يسبق الاستنتاج: لا تسجّل نية أو نسبة بلا برهان.','سجّل التجزئة وسلسلة الحيازة لكل دليل.','رتّب الأحداث زمنيًا لتصل إلى السبب الجذري.']},
+ {id:4,name:'مواجهة برمجية الفدية',en:'Ransomware Response',tag:'متقدم',tone:'bad',time:300,run:L4,
+  mission:'03:12 فجرًا: ملاحظة فدية على خادم الملفات. كل ثانية تأخير تنتشر الإصابة إلى أجهزة جديدة. أمامك خمس مراحل قرار، من الاحتواء حتى الإبلاغ.',
+  goals:['احتواء الانتشار قبل أي شيء آخر','تحديد النطاق الحقيقي للإصابة واستئصالها','استعادة آمنة من نسخ معزولة، وتواصل منضبط'],
+  lessons:['الاحتواء أولًا، فهو يحدد حجم الخسارة.','النسخ الاحتياطية المعزولة خط الدفاع الأخير: تحقق منها قبل الاستعادة.','لا تدفع الفدية قبل التقييم القانوني، ولا ضمان بفك التشفير.']},
+ {id:5,name:'أزمة مركز العمليات',en:'Full SOC Crisis',tag:'متقدم',tone:'bad',time:600,run:L5,
+  mission:'حادث متعدد المراحل: اختراق حساب مدير، ثم تسريب بيانات، ثم فدية. في كل مرحلة يملك كل دور قراره. في هذه النسخة تؤدي الأدوار الأربعة بنفسك، وفي الإصدار الجماعي يتولى كل متدرب دورًا.',
+  goals:['التنسيق بين أدوار الرصد والأدلة والقيادة والاتصال','اتخاذ القرار الصحيح في كل مرحلة مع تطور الحادث','إدارة الجانب القانوني والإعلامي بالتوازي مع الجانب التقني'],
+  lessons:['الأدوار تتكامل: قرار كل دور يغيّر خيارات الآخرين.','التواصل الموحد جزء من الاستجابة وليس ملحقًا بها.','وثّق كل خطوة لتستفيد منها في مراجعة ما بعد الحادث.']}
+];
+
+/* ---------- animated scenes (static markup, no user data) ---------- */
+const SVGH='<svg viewBox="0 0 700 150" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">';
+const env=(d,bad)=>'<g class="trav" style="--dx:440px;animation-delay:'+d+'"><rect class="env'+(bad?' bad':'')+'" x="120" y="64" width="26" height="18" rx="2"/><path class="envf'+(bad?' bad':'')+'" d="M120 64l13 10 13-10"/></g>';
+const cells=(()=>{let o='';for(let r=0;r<3;r++)for(let c=0;c<15;c++)o+='<rect class="cell" style="--i:'+(c+r)+'" x="'+(40+c*30)+'" y="'+(30+r*30)+'" width="22" height="22" rx="3"/>';return o})();
+const bars=[380,520,300,450,560,340].map((w,i)=>'<rect class="sc-bar'+((i===1||i===4)?' hl flash':'')+'" x="40" y="'+(18+i*20)+'" width="'+w+'" height="8" rx="2"/>').join('');
+const SCENES={
+ 1:SVGH+'<line class="sc-link" x1="110" y1="75" x2="590" y2="75"/><rect class="sc-node bad" x="30" y="45" width="80" height="60" rx="6"/><text class="sc-t" x="70" y="80" text-anchor="middle">ATTACKER</text><rect class="sc-node acc" x="590" y="45" width="80" height="60" rx="6"/><text class="sc-t" x="630" y="80" text-anchor="middle">INBOX</text>'+env('0s',false)+env('-1.4s',true)+env('-2.8s',true)+'<text class="sc-t flash" x="350" y="130" text-anchor="middle">3 REPORTED MESSAGES</text></svg>',
+ 2:SVGH+'<line class="sc-link" x1="110" y1="75" x2="390" y2="75"/><line class="sc-link" x1="460" y1="62" x2="590" y2="38"/><rect class="sc-node bad" x="30" y="48" width="80" height="54" rx="6"/><text class="sc-t" x="70" y="80" text-anchor="middle">EXT</text><rect class="sc-node" x="215" y="28" width="12" height="94" rx="3"/><text class="sc-t" x="221" y="142" text-anchor="middle">FW</text><circle class="ring" cx="425" cy="75" r="34"/><circle class="ring" cx="425" cy="75" r="34" style="animation-delay:-1.2s"/><circle class="sc-node bad" cx="425" cy="75" r="34"/><text class="sc-t" x="425" y="80" text-anchor="middle">HOST</text><rect class="sc-node bad" x="590" y="12" width="90" height="52" rx="6"/><text class="sc-t" x="635" y="43" text-anchor="middle">C2</text><circle class="sc-dot trav" style="--dx:270px" cx="115" cy="75" r="5"/><circle class="sc-dot trav" style="--dx:270px;animation-delay:-1.4s" cx="115" cy="75" r="5"/><circle class="sc-dot trav" style="--dx:270px;animation-delay:-2.8s" cx="115" cy="75" r="5"/><circle class="sc-dot warn trav" style="--dx:125px;--dy:-30px" cx="462" cy="62" r="5"/><circle class="sc-dot warn trav" style="--dx:125px;--dy:-30px;animation-delay:-2.1s" cx="462" cy="62" r="5"/></svg>',
+ 3:SVGH+bars+'<rect class="scan" x="36" y="8" width="3" height="120"/><text class="sc-t" x="40" y="146">EVIDENCE.IMG · SHA-256 4be1…c9a2</text></svg>',
+ 4:SVGH+cells+'<rect class="sc-node bad flash" x="540" y="45" width="120" height="60" rx="6"/><text class="sc-t flash" x="600" y="80" text-anchor="middle">LOCKED</text></svg>',
+ 5:SVGH+'<circle class="sc-ring" cx="350" cy="75" r="25"/><circle class="sc-ring" cx="350" cy="75" r="50"/><circle class="sc-ring" cx="350" cy="75" r="70"/><g class="spin" style="transform-origin:350px 75px"><line x1="350" y1="75" x2="350" y2="5" stroke="var(--accent)" stroke-width="2"/></g><circle class="blip" cx="400" cy="45" r="5"/><circle class="blip" cx="305" cy="100" r="5" style="animation-delay:-.7s"/><circle class="blip" cx="385" cy="108" r="5" style="animation-delay:-1.3s"/><circle class="blip" cx="318" cy="40" r="5" style="animation-delay:-.3s"/><text class="sc-t" x="30" y="40">ANALYST</text><text class="sc-t" x="30" y="70">FORENSICS</text><text class="sc-t" x="670" y="40" text-anchor="end">COMMANDER</text><text class="sc-t" x="670" y="70" text-anchor="end">COMMS</text></svg>'
+};
+
+/* ---------- shell ---------- */
+const stageEl=$('#stage'),railEl=$('#rail'),totalEl=$('#total');
+let cur=null,timer=null,play=null;
+const total=()=>LV.reduce((s,l)=>s+(saved[l.id]?saved[l.id].score:0),0);
+function renderRail(){
+  railEl.replaceChildren(...LV.map(l=>h('button',{type:'button',class:'lv','aria-current':cur===l.id?'true':'false',onclick:()=>openBrief(l.id)},
+    h('span',{class:'n'},'0'+l.id),
+    h('span',{},h('b',{},l.name),h('span',{class:'sub'},h('span',{class:'chip '+l.tone},l.tag),saved[l.id]?h('span',{},'أفضل: '+saved[l.id].score):null)))));
+  totalEl.textContent=String(total());
+}
+function stopTimer(){
+  clearInterval(timer);timer=null;
+  if(play&&play.cleanups){play.cleanups.forEach(f=>{try{f()}catch(e){}});play.cleanups=[]}
+}
+function home(){
+  stopTimer();cur=null;renderRail();
+  stageEl.replaceChildren(h('section',{class:'card'},
+    h('p',{class:'kicker'},'محاكاة تفاعلية'),
+    h('h2',{},'تدرّب على الاستجابة قبل أن يقع الحادث'),
+    h('p',{},'خمسة مستويات متدرجة تحاكي ما يواجهه فريق الأمن، من بريد مشبوه إلى أزمة متعددة المراحل. لكل قرار أثر، والوقت يعمل ضدك.'),
+    h('div',{class:'how'},
+      h('div',{},h('b',{},'قرارات تحت الضغط'),h('span',{class:'small muted'},'لكل مستوى مؤقت. السرعة تضيف نقاطًا، لكن الدقة هي الأساس.')),
+      h('div',{},h('b',{},'عواقب ظاهرة'),h('span',{class:'small muted'},'القرار الخاطئ يوسّع الإصابة أو يتلف الأدلة، ويظهر أثره فورًا.')),
+      h('div',{},h('b',{},'تقرير بعد كل مستوى'),h('span',{class:'small muted'},'تعرف لماذا أصبت أو أخطأت وما كان ينبغي فعله.'))),
+    h('div',{class:'row'},h('button',{type:'button',class:'btn',onclick:()=>openBrief(1)},'ابدأ المستوى الأول'))));
+}
+function openBrief(id){
+  stopTimer();play=null;cur=id;renderRail();
+  const l=LV.find(x=>x.id===id),b=saved[id];
+  stageEl.replaceChildren(h('section',{class:'card'},
+    h('p',{class:'kicker'},'المستوى 0'+id+' · '+l.en),
+    h('h2',{},l.name),
+    h('div',{class:'row'},h('span',{class:'chip '+l.tone},l.tag),h('span',{class:'chip neutral'},'المدة '+fmt(l.time)),b?h('span',{class:'chip neutral'},'أفضل نتيجة '+b.score):null),
+    h('p',{},l.mission),
+    h('h3',{},'ما الذي ستتدرب عليه'),
+    h('ul',{},l.goals.map(g=>h('li',{},g))),
+    h('div',{class:'row'},h('button',{type:'button',class:'btn',onclick:()=>startLevel(id)},'ابدأ المحاكاة'))));
+}
+function startLevel(id){
+  stopTimer();
+  const l=LV.find(x=>x.id===id);cur=id;renderRail();
+  const root=h('div',{class:'col'});
+  const clock=h('span',{class:'clock'},fmt(l.time));
+  const prog=h('p',{class:'prog'},'');
+  const scene=h('div',{class:'scene run','aria-hidden':'true'});
+  scene.innerHTML=SCENES[l.id]+'<div class="tb"></div>';
+  stageEl.replaceChildren(
+    h('div',{class:'bar'},h('div',{},h('p',{class:'kicker'},'المستوى 0'+l.id),h('h2',{},l.name)),h('div',{class:'timebox'},h('span',{},'الوقت المتبقي'),clock)),
+    scene,prog,root);
+  play={l,start:Date.now(),limit:l.time,done:false,endAt:0,clock,scene,cleanups:[],force:null};
+  const api={
+    setProgress:t=>{prog.textContent=t},
+    stopClock:()=>{clearInterval(timer);timer=null;if(!play.endAt)play.endAt=Date.now();play.scene.classList.remove('run')},
+    cleanup:f=>play.cleanups.push(f),
+    finish:res=>endLevel(res)
+  };
+  play.force=l.run(root,api);
+  timer=setInterval(tick,250);
+}
+function tick(){
+  if(!play||play.done)return;
+  const left=Math.max(0,play.limit-Math.floor((Date.now()-play.start)/1000));
+  play.clock.textContent=fmt(left);
+  play.clock.classList.toggle('low',left<=20);
+  play.scene.style.setProperty('--t',String(left/play.limit));
+  play.scene.classList.toggle('low',left<=20);
+  if(left===0){clearInterval(timer);timer=null;if(!play.endAt)play.endAt=Date.now();play.scene.classList.remove('run');if(play.force)play.force(true)}
+}
+function endLevel(res){
+  if(!play||play.done)return;
+  play.done=true;stopTimer();
+  const l=play.l;
+  const used=Math.min(play.limit,Math.round(((play.endAt||Date.now())-play.start)/1000));
+  const bonus=res.acc>=60?Math.round(10*(play.limit-used)/play.limit):0;
+  const score=res.acc+bonus;
+  const prev=saved[l.id];
+  if(!prev||score>prev.score){saved[l.id]={score:score,acc:res.acc,time:used};persist()}
+  renderRail();
+  const r=rate(res.acc),nxt=LV.find(x=>x.id===l.id+1);
+  stageEl.replaceChildren(h('section',{class:'card'},
+    h('p',{class:'kicker'},'نتيجة المستوى 0'+l.id),
+    h('h2',{},l.name),
+    h('div',{class:'big'},h('b',{},score),h('span',{class:'muted'},'دقة القرارات '+res.acc+'% + نقاط السرعة '+bonus),h('span',{class:'chip '+r.tone},r.t)),
+    h('p',{class:'muted small'},'الزمن المستغرق '+fmt(used)+' من '+fmt(play.limit)+(res.note?' · '+res.note:'')),
+    h('div',{class:'tw'},h('table',{class:'log static'},
+      h('thead',{},h('tr',{},h('th',{},'البند'),h('th',{},'النقاط'))),
+      h('tbody',{},res.rows.map(x=>h('tr',{},h('td',{},x.label),h('td',{class:'m'},x.pts+' / '+x.max)))))),
+    res.review||null,
+    h('h3',{},'أهم الدروس'),
+    h('ul',{},l.lessons.map(x=>h('li',{},x))),
+    h('div',{class:'row'},
+      h('button',{type:'button',class:'btn ghost',onclick:()=>startLevel(l.id)},'أعد المحاولة'),
+      nxt?h('button',{type:'button',class:'btn',onclick:()=>openBrief(nxt.id)},'المستوى التالي: '+nxt.name):h('button',{type:'button',class:'btn',onclick:home},'العودة إلى الرئيسية'))));
+}
+
+/* ---------- level 1: phishing ---------- */
+function L1(root,api){
+  const E=[
+   {from:'قسم تقنية المعلومات',addr:'it-support@alnoor-secure-login.com',date:'اليوم 08:12',
+    subject:'عاجل: سيتم إيقاف حسابك خلال 24 ساعة',greet:'عزيزي المستخدم،',
+    body:['رصدنا نشاطًا غير معتاد على حسابك. لتفادي الإيقاف الكامل يجب تأكيد كلمة المرور خلال ساعتين.'],
+    link:{text:'https://portal.alnoor.example/verify',real:'http://alnoor-verify.top/login'},
+    attach:'نموذج_التحقق.zip',sig:'فريق الدعم الفني',phish:true,
+    clues:{from:true,subject:true,greet:true,link:true,attach:true,sig:false},
+    why:{from:'النطاق alnoor-secure-login.com ليس نطاق الشركة (alnoor.example).',
+         subject:'التهديد بالإيقاف وضيق الوقت أسلوب ضغط نفسي شائع.',
+         greet:'تحية عامة بلا اسم: رسالة جماعية وليست موجهة إليك.',
+         link:'النص يوحي بنطاق الشركة لكن الوجهة الفعلية نطاق آخر.',
+         attach:'ملف مضغوط لا يُتوقع في طلب تحقق، وقد يحمل برمجية خبيثة.',
+         sig:'توقيع عام يستطيع أي مهاجم كتابته، فلا يثبت شيئًا.'},
+    note:'رسالة تصيّد لسرقة بيانات الدخول.'},
+   {from:'الموارد البشرية',addr:'hr@alnoor.example',date:'أمس 14:30',
+    subject:'دورة التوعية الأمنية السنوية: اختر موعدك',greet:'الزميلة الفاضلة / الزميل الفاضل،',
+    body:['تفتح الموارد البشرية التسجيل في دورة التوعية الأمنية السنوية. التسجيل متاح حتى نهاية الأسبوع عبر بوابة الموظفين الداخلية.','لا يُطلب منك إدخال كلمة المرور في أي نموذج خارج البوابة.'],
+    link:{text:'https://intranet.alnoor.example/training',real:'https://intranet.alnoor.example/training'},
+    sig:'إدارة الموارد البشرية',phish:false,
+    clues:{from:false,subject:false,link:false},
+    why:{from:'النطاق alnoor.example هو نطاق الشركة الرسمي.',
+         subject:'موضوع اعتيادي بلا استعجال ولا تهديد.',
+         link:'الوجهة الفعلية تطابق النص وتعود لبوابة الشركة.'},
+    note:'رسالة سليمة، والإبلاغ عنها كتصيّد بلاغ كاذب.'},
+   {from:'المدير المالي — خالد العتيبي',addr:'cfo@alnoor-example.com',reply:'khaled.office@mail.example',date:'اليوم 16:47',
+    subject:'تحويل عاجل وسري — لا تناقش مع أحد',greet:'مرحبًا،',
+    body:['أنا الآن في اجتماع مغلق ولا أستطيع الرد على الهاتف.',{k:'request',t:'أحتاج تحويل 48,000 دولار اليوم إلى مورّد جديد: Gulf Trade Co. تجاوز الموافقات المعتادة هذه المرة، وأكّد لي بمجرد التنفيذ.'}],
+    sig:'خالد العتيبي — المدير المالي',phish:true,
+    clues:{from:true,reply:true,subject:true,request:true,sig:false},
+    why:{from:'النطاق alnoor-example.com يشبه نطاق الشركة لكنه مختلف عنه.',
+         reply:'عنوان الرد خارجي لا يعود للشركة، فستصل الردود إلى المهاجم.',
+         subject:'السرية والاستعجال ومنع التواصل من علامات احتيال المدير المالي.',
+         request:'مبلغ كبير إلى مورّد جديد مع تجاوز الموافقات يخالف إجراءات الدفع.',
+         sig:'الاسم والمنصب صحيحان ظاهريًا لكن انتحالهما سهل.'},
+    note:'احتيال انتحال المدير المالي (BEC).'}
+  ];
+  let i=0,flagged=new Set(),locked=false,finished=false;const pts=[];
+  const box=h('div',{class:'col'});root.append(box);
+  const clueScore=(e,fl)=>{
+    const keys=Object.keys(e.clues),tr=keys.filter(k=>e.clues[k]);
+    const hit=tr.filter(k=>fl.has(k)).length,wrong=[...fl].filter(k=>!e.clues[k]).length;
+    const base=tr.length?10*hit/tr.length:10;
+    return Math.max(0,Math.round(base-3*wrong));
+  };
+  function draw(){
+    const e=E[i];flagged=new Set();locked=false;
+    api.setProgress('الرسالة '+(i+1)+' من '+E.length+' — اضغط على العناصر المشبوهة داخل الرسالة ثم احكم عليها');
+    const toggle=ev=>{
+      if(locked)return;
+      const b=ev.currentTarget,k=b.dataset.k;
+      if(flagged.has(k)){flagged.delete(k);b.classList.remove('on');b.setAttribute('aria-pressed','false')}
+      else{flagged.add(k);b.classList.add('on');b.setAttribute('aria-pressed','true')}
+    };
+    const hot=(k,...c)=>(k in e.clues)?h('button',{type:'button',class:'hot','data-k':k,'aria-pressed':'false',onclick:toggle},...c):h('span',{},...c);
+    const addr=h('bdi',{dir:'ltr',class:'mono'},e.addr);
+    const mail=h('article',{class:'email'},
+      h('div',{class:'meta'},h('span',{class:'k'},'من'),hot('from',e.from+' ',addr)),
+      e.reply?h('div',{class:'meta'},h('span',{class:'k'},'الرد إلى'),hot('reply',h('bdi',{dir:'ltr',class:'mono'},e.reply))):null,
+      h('div',{class:'meta'},h('span',{class:'k'},'الموضوع'),hot('subject',e.subject)),
+      h('div',{class:'meta'},h('span',{class:'k'},'التاريخ'),h('span',{},e.date)),
+      h('div',{class:'body'},
+        h('p',{},hot('greet',e.greet)),
+        e.body.map(p=>typeof p==='string'?h('p',{},p):h('p',{},hot(p.k,p.t))),
+        e.link?h('p',{},'الرابط: ',hot('link',h('bdi',{dir:'ltr',class:'mono'},e.link.text))):null,
+        e.link?h('p',{class:'real mono'},'الوجهة الفعلية عند التمرير: '+e.link.real):null,
+        e.attach?h('p',{},'المرفق: ',hot('attach',e.attach)):null,
+        h('p',{},hot('sig',e.sig))));
+    const fbBox=h('div',{});
+    const verdict=h('div',{class:'row'},
+      h('button',{type:'button',class:'btn bad',onclick:()=>judge('phish')},'تصيّد'),
+      h('button',{type:'button',class:'btn ok',onclick:()=>judge('safe')},'رسالة سليمة'));
+    function judge(v){
+      if(locked)return;locked=true;
+      const right=(v==='phish')===e.phish,cs=clueScore(e,flagged),p=(right?20:0)+cs;pts[i]=p;
+      mail.querySelectorAll('.hot').forEach(b=>{
+        const k=b.dataset.k,t=e.clues[k],f=flagged.has(k);
+        b.classList.remove('on');
+        if(t&&f)b.classList.add('hit');else if(t)b.classList.add('miss');else if(f)b.classList.add('fp');
+      });
+      verdict.querySelectorAll('button').forEach(b=>{b.disabled=true});
+      const last=i===E.length-1;
+      fbBox.replaceChildren(h('div',{class:'fb '+(right?'good':'bad')},
+        h('b',{},(right?'حكم صحيح':'حكم خاطئ')+' — '+e.note),
+        h('ul',{},Object.keys(e.why).map(k=>{
+          const t=e.clues[k],f=flagged.has(k);
+          const s=t&&f?['hit','رصدتها']:t?['miss','فاتتك']:f?['fp','علامة خاطئة']:['neutral','سليمة'];
+          return h('li',{},h('span',{class:'st '+s[0]},s[1]),e.why[k]);
+        })),
+        h('p',{class:'small'},'نقاط هذه الرسالة: '+p+' / 30'),
+        h('div',{class:'row'},h('button',{type:'button',class:'btn',onclick:()=>{if(last)done();else{i++;draw()}}},last?'إنهاء المستوى':'الرسالة التالية'))));
+    }
+    box.replaceChildren(mail,verdict,fbBox);
+  }
+  function done(){
+    if(finished)return;finished=true;
+    const acc=Math.round(pts.reduce((a,b)=>a+(b||0),0)/(E.length*30)*100);
+    api.finish({acc:acc,rows:E.map((e,j)=>({label:'رسالة '+(j+1)+': '+e.subject,pts:pts[j]||0,max:30}))});
+  }
+  draw();
+  return ()=>done();
+}
+
+/* ---------- level 2: network ---------- */
+function L2(root,api){
+  const R=[
+   {t:'09:02:11',s:'10.0.4.15',d:'52.96.12.4:443',e:'HTTPS — تحديثات النظام',z:'2.1 MB',bad:false,n:'تحديث نظام معتاد إلى خادم موثوق.'},
+   {t:'09:03:40',s:'185.220.101.7',d:'10.0.4.23:22',e:'SSH — 312 محاولة دخول فاشلة في دقيقة',z:'—',bad:true,n:'تخمين كلمات مرور من عنوان خارجي.'},
+   {t:'09:04:02',s:'10.0.4.30',d:'10.0.1.5:445',e:'SMB — نسخ احتياطي مجدول',z:'18 GB',bad:false,n:'مهمة النسخ الاحتياطي المعتادة بين خادمين داخليين.'},
+   {t:'09:05:18',s:'185.220.101.7',d:'10.0.4.23:22',e:'SSH — تسجيل دخول ناجح (root)',z:'—',bad:true,n:'نجاح الدخول من العنوان نفسه بعد التخمين يعني اختراق الجهاز.'},
+   {t:'09:07:55',s:'10.0.4.23',d:'10.0.4.0/24',e:'مسح المنافذ 1–1024',z:'—',bad:true,n:'استطلاع داخلي من الجهاز المخترق تمهيدًا للانتقال الجانبي.'},
+   {t:'09:12:30',s:'10.0.4.23',d:'91.214.124.9:8443',e:'اتصال دوري كل 60 ثانية',z:'0.4 KB',bad:true,n:'نمط إشارة قيادة وتحكم (C2) نحو عنوان خارجي غير معروف.'},
+   {t:'09:15:09',s:'10.0.4.12',d:'8.8.8.8:53',e:'DNS — استعلامات عادية',z:'12 KB',bad:false,n:'استعلامات DNS اعتيادية.'},
+   {t:'09:21:44',s:'10.0.4.23',d:'91.214.124.9:443',e:'رفع ملفات (HTTPS)',z:'4.7 GB',bad:true,n:'رفع 4.7 GB من الجهاز المخترق إلى العنوان نفسه: تسريب بيانات.'},
+   {t:'09:25:00',s:'10.0.2.8',d:'10.0.1.2:389',e:'LDAP — مصادقة مستخدمين',z:'0.2 MB',bad:false,n:'مصادقة طبيعية داخل الشبكة.'},
+   {t:'09:30:13',s:'10.0.4.40',d:'cdn.learn-host.example:443',e:'بث فيديو تدريبي',z:'220 MB',bad:false,n:'بث من شبكة توصيل محتوى معروفة، حجم كبير لكنه مشروع.'}
+  ];
+  const A=shuffle([
+   {t:'عزل الجهاز 10.0.4.23 عن الشبكة',ok:true,why:'يقطع القناة مع المهاجم ويوقف التسريب والانتشار.'},
+   {t:'حظر 185.220.101.7 و91.214.124.9 على الجدار الناري',ok:true,why:'يمنع عودة المهاجم واتصال التحكم.'},
+   {t:'إغلاق SSH المكشوف للإنترنت وتدوير كلمات المرور والمفاتيح',ok:true,why:'يسد نقطة الدخول ويبطل البيانات المسروقة.'},
+   {t:'التقاط صورة للذاكرة والسجلات قبل أي تغيير',ok:true,why:'الأدلة المتطايرة تضيع بعد إعادة التشغيل.'},
+   {t:'إعادة تشغيل الخادم فورًا',ok:false,why:'يمحو الذاكرة والأدلة ولا يغلق الثغرة.'},
+   {t:'حذف سجلات الدخول لتقليل الضجيج',ok:false,why:'إتلاف أدلة يقضي على قدرة التحقيق.'},
+   {t:'تجاهل التنبيه واعتباره ناتجًا عن النسخ الاحتياطي',ok:false,why:'التنبيهات تخص جهازًا واتصالات مختلفة عن مهمة النسخ.'}
+  ]);
+  const selR=new Set(),selA=new Set();let sub=false;
+  const tb=h('tbody');
+  const rows=R.map((r,i)=>{
+    const cb=h('input',{type:'checkbox','aria-label':'اشتباه'});
+    const nt=h('td',{class:'note'});
+    const tr=h('tr',{onclick:ev=>{
+      if(sub)return;
+      if(ev.target!==cb)cb.checked=!cb.checked;
+      if(cb.checked)selR.add(i);else selR.delete(i);
+      tr.classList.toggle('sel',cb.checked);
+      upd();
+    }},h('td',{},cb),h('td',{class:'m'},r.t),h('td',{class:'m'},r.s),h('td',{class:'m'},r.d),h('td',{},r.e),h('td',{class:'m'},r.z),nt);
+    tb.append(tr);return {tr,cb,nt};
+  });
+  const count=h('span',{class:'chip neutral'},'');
+  const abtns=A.map((a,i)=>h('button',{type:'button',class:'opt','aria-pressed':'false',onclick:ev=>{
+    if(sub)return;const b=ev.currentTarget;
+    if(selA.has(i)){selA.delete(i);b.classList.remove('sel');b.setAttribute('aria-pressed','false')}
+    else{selA.add(i);b.classList.add('sel');b.setAttribute('aria-pressed','true')}
+    upd();
+  }},h('span',{},a.t)));
+  const submitBtn=h('button',{type:'button',class:'btn',onclick:()=>submit(false)},'تنفيذ الاستجابة');
+  const out=h('div',{});
+  function upd(){count.textContent='الأحداث المعلّمة: '+selR.size+' · الإجراءات: '+selA.size}
+  upd();
+  api.setProgress('علّم الأحداث الخبيثة في الجدول، ثم اختر إجراءات الاستجابة، ثم نفّذ');
+  root.append(
+    h('h3',{},'1. حلّل الأحداث'),
+    h('div',{class:'tw'},h('table',{class:'log'},h('thead',{},h('tr',{},['','الوقت','المصدر','الوجهة','الحدث','الحجم','التحليل'].map(x=>h('th',{},x)))),tb)),
+    h('h3',{},'2. اختر الاستجابة'),
+    h('div',{class:'opts'},abtns),
+    h('div',{class:'row'},submitBtn,count),out);
+  let result=null;
+  function submit(timedOut){
+    if(sub)return;sub=true;api.stopClock();submitBtn.disabled=true;
+    const tp=[...selR].filter(i=>R[i].bad).length,fp=selR.size-tp;
+    const tpa=[...selA].filter(i=>A[i].ok).length,fpa=selA.size-tpa;
+    const det=Math.min(60,Math.max(0,12*tp-8*fp)),act=Math.min(40,Math.max(0,10*tpa-10*fpa));
+    rows.forEach((x,i)=>{
+      const r=R[i],s=selR.has(i);
+      x.cb.disabled=true;x.tr.classList.remove('sel');
+      x.tr.classList.add(r.bad&&s?'hit':r.bad?'miss':s?'fp':'x');
+      x.nt.textContent=(r.bad?'خبيث — ':'سليم — ')+r.n;
+    });
+    abtns.forEach((b,i)=>{
+      const a=A[i],s=selA.has(i);b.disabled=true;b.classList.remove('sel');
+      b.classList.add(a.ok&&s?'hit':a.ok?'miss':s?'fp':'x');
+      b.append(h('span',{class:'why'},(a.ok?'إجراء صحيح — ':'إجراء خاطئ — ')+a.why));
+    });
+    result={acc:det+act,rows:[{label:'اكتشاف الأحداث الخبيثة',pts:det,max:60},{label:'إجراءات الاستجابة',pts:act,max:40}]};
+    out.replaceChildren(h('div',{class:'fb '+(det+act>=75?'good':det+act>=50?'mid':'bad')},
+      timedOut?h('b',{},'انتهى الوقت: سُجّلت اختياراتك الحالية.'):null,
+      h('p',{},'اكتشفت '+tp+' من 5 أحداث خبيثة، مع '+fp+' بلاغ خاطئ. الإجراءات الصحيحة المختارة: '+tpa+' من 4.'),
+      h('div',{class:'row'},h('button',{type:'button',class:'btn',onclick:()=>api.finish(result)},'عرض النتيجة'))));
+  }
+  return t=>submit(!!t);
+}
+
+/* ---------- level 3: forensics ---------- */
+function L3(root,api){
+  const EV={
+   auth:{t:'سجل المصادقة',lines:[
+    '2026-11-12 17:41:08  WS-114      salma.k  LOGON      interactive  OK',
+    '2026-11-13 02:13:51  WS-114      salma.k  LOGON      RDP  src=203.0.113.58  OK',
+    '2026-11-13 02:14:20  WS-114      salma.k  GROUP_ADD  Local Administrators  by=salma.k',
+    '2026-11-13 02:31:09  FILESRV-02  salma.k  LOGON      network  OK',
+    '2026-11-13 02:52:44  WS-114      salma.k  LOGOFF']},
+   proxy:{t:'سجل الوكيل',lines:[
+    '2026-11-12 17:55:31  WS-114  GET   http://alnoor-hr-benefits.example/form     200',
+    '2026-11-12 17:56:12  WS-114  POST  http://alnoor-hr-benefits.example/submit   200  body=1.2KB',
+    '2026-11-13 02:40:02  WS-114  PUT   https://files-share.example/u/9f3k         200  1.9GB']},
+   proc:{t:'العمليات',lines:[
+    '2026-11-13 02:15:03  WS-114  cmd.exe -> 7z.exe     a D:\\Finance\\archive.7z D:\\Finance\\*',
+    '2026-11-13 02:26:10  WS-114  cmd.exe -> rclone.exe copy D:\\Finance\\archive.7z remote:u/9f3k']},
+   files:{t:'الملفات',lines:[
+    '2026-11-13 02:18:12  READ    D:\\Finance\\Q3_payroll.xlsx',
+    '2026-11-13 02:19:47  CREATE  D:\\Finance\\archive.7z  1.9GB',
+    '2026-11-13 02:41:30  DELETE  D:\\Finance\\archive.7z']}
+  };
+  const Q=[
+   {q:'ما نقطة الدخول الأولى للمهاجم؟',o:[{t:'سرقة بيانات الدخول عبر صفحة تصيّد',ok:true},{t:'جهاز USB خارجي',ok:false},{t:'استغلال ثغرة في خادم الويب العام',ok:false},{t:'دخول فيزيائي إلى المكتب',ok:false}],
+    why:'طلب POST إلى نطاق غير تابع للشركة قبل ساعات، ثم دخول RDP بالحساب نفسه من عنوان خارجي.'},
+   {q:'متى بدأ الدخول عن بُعد؟',o:[{t:'2026-11-12 17:56',ok:false},{t:'2026-11-13 02:13:51',ok:true},{t:'2026-11-13 02:31:09',ok:false},{t:'2026-11-13 02:40:02',ok:false}],
+    why:'جلسة RDP من 203.0.113.58 في سجل المصادقة.'},
+   {q:'ما الأداة التي رفعت البيانات؟',o:[{t:'7z.exe',ok:false},{t:'rclone.exe',ok:true},{t:'cmd.exe',ok:false},{t:'PowerShell',ok:false}],
+    why:'7z ضغط الملفات فقط، أما rclone فنسخ الأرشيف إلى وجهة خارجية.'},
+   {q:'ما حجم البيانات المسرّبة تقريبًا؟',o:[{t:'1.2 KB',ok:false},{t:'1.9 GB',ok:true},{t:'18 GB',ok:false},{t:'4.7 GB',ok:false}],
+    why:'طلب PUT بحجم 1.9GB يطابق حجم الأرشيف.'},
+   {q:'ما أنسب أول إجراء احتواء؟',o:[{t:'تعطيل حساب salma.k وعزل WS-114 مع حفظ صورة جنائية',ok:true},{t:'حذف الجهاز وإعادة تهيئته فورًا',ok:false},{t:'إبلاغ الصحافة',ok:false},{t:'الانتظار حتى انتهاء التقرير',ok:false}],
+    why:'الاحتواء مع حفظ الأدلة يوقف الضرر دون إتلاف ما نحتاجه للتحقيق.'}
+  ].map(x=>({...x,o:shuffle(x.o)}));
+  const ST=shuffle([
+   {t:'استُخدم حساب salma.k للدخول عن بُعد (RDP) من 203.0.113.58 في 02:13:51.',ok:true,why:'مثبت في سجل المصادقة.'},
+   {t:'أُنشئ أرشيف مضغوط للمجلد المالي ثم رُفع بحجم 1.9 GB.',ok:true,why:'مثبت في سجلات العمليات والوكيل والملفات.'},
+   {t:'الموظفة سلمى نفّذت التسريب عمدًا.',ok:false,why:'لا دليل على النية، والحساب قد يكون مسروقًا.'},
+   {t:'الجهة المنفذة تابعة لدولة معينة.',ok:false,why:'نسبة بلا دليل تضعف التقرير.'},
+   {t:'جرى الوصول إلى Q3_payroll.xlsx أثناء عملية الضغط.',ok:true,why:'مثبت في سجل الملفات.'},
+   {t:'أُخذت صورة القرص مع تسجيل التجزئة وسلسلة الحيازة.',ok:true,why:'إجراء موثّق في ملاحظة سلسلة الحيازة.'}
+  ]);
+  const ans={},picked=new Set();let sub=false,result=null;
+  const evBox=h('pre',{class:'ev'});
+  const tabs=h('div',{class:'tabs',role:'tablist'},Object.keys(EV).map(k=>h('button',{type:'button',role:'tab',class:'tab','data-k':k,onclick:()=>setTab(k)},EV[k].t)));
+  function setTab(k){
+    evBox.textContent=EV[k].lines.join('\n');
+    tabs.querySelectorAll('.tab').forEach(b=>b.setAttribute('aria-selected',String(b.dataset.k===k)));
+  }
+  const qEls=Q.map((q,qi)=>{
+    const why=h('p',{class:'small muted'},'');
+    const bs=q.o.map((o,oi)=>h('button',{type:'button',class:'opt','aria-pressed':'false',onclick:()=>{
+      if(sub)return;ans[qi]=oi;
+      bs.forEach((b,j)=>{b.classList.toggle('sel',j===oi);b.setAttribute('aria-pressed',String(j===oi))});
+    }},o.t));
+    return {bs,why,node:h('div',{class:'qblock'},h('h3',{},(qi+1)+'. '+q.q),h('div',{class:'opts'},bs),why)};
+  });
+  const sBtns=ST.map((s,si)=>h('button',{type:'button',class:'opt','aria-pressed':'false',onclick:ev=>{
+    if(sub)return;const b=ev.currentTarget;
+    if(picked.has(si)){picked.delete(si);b.classList.remove('sel');b.setAttribute('aria-pressed','false')}
+    else{picked.add(si);b.classList.add('sel');b.setAttribute('aria-pressed','true')}
+  }},h('span',{},s.t)));
+  const submitBtn=h('button',{type:'button',class:'btn',onclick:()=>submit(false)},'تسليم التقرير');
+  const out=h('div',{});
+  api.setProgress('تصفّح الأدلة، أجب عن الأسئلة، ثم اختر عبارات التقرير المدعومة بالدليل');
+  root.append(
+    h('h3',{},'الأدلة'),tabs,evBox,
+    h('p',{class:'small muted'},'سلسلة الحيازة: صورة القرص أُخذت 09:10 بواسطة المحقق، وسُجّلت تجزئة SHA-256 للصورة (4be1…c9a2) قبل أي تحليل.'),
+    h('h3',{},'الأسئلة التحليلية'),
+    qEls.map(x=>x.node),
+    h('div',{class:'qblock'},h('h3',{},'عبارات التقرير'),h('p',{class:'small muted'},'اختر العبارات التي يدعمها الدليل ويجوز إدراجها في تقرير الحادث.'),h('div',{class:'opts'},sBtns)),
+    h('div',{class:'row'},submitBtn),out);
+  setTab('auth');
+  function submit(timedOut){
+    if(sub)return;sub=true;api.stopClock();submitBtn.disabled=true;
+    let qp=0;
+    Q.forEach((q,qi)=>{
+      const e=qEls[qi],ch=ans[qi];
+      if(ch!=null&&q.o[ch].ok)qp+=12;
+      e.bs.forEach((b,j)=>{
+        b.disabled=true;b.classList.remove('sel');
+        if(q.o[j].ok)b.classList.add(ch===j?'hit':'miss');else if(ch===j)b.classList.add('fp');
+      });
+      e.why.textContent=(ch==null?'لم تجب. ':'')+q.why;
+    });
+    let hits=0,wrong=0;
+    ST.forEach((s,si)=>{
+      const b=sBtns[si],p=picked.has(si);b.disabled=true;b.classList.remove('sel');
+      if(s.ok&&p){hits++;b.classList.add('hit')}else if(s.ok)b.classList.add('miss');else if(p){wrong++;b.classList.add('fp')}
+      b.append(h('span',{class:'why'},(s.ok?'يجوز إدراجها — ':'لا يجوز إدراجها — ')+s.why));
+    });
+    const sp=Math.min(40,Math.max(0,10*hits-10*wrong));
+    result={acc:qp+sp,rows:[{label:'الأسئلة التحليلية',pts:qp,max:60},{label:'عبارات التقرير',pts:sp,max:40}]};
+    out.replaceChildren(h('div',{class:'fb '+(qp+sp>=75?'good':qp+sp>=50?'mid':'bad')},
+      timedOut?h('b',{},'انتهى الوقت: سُجّلت إجاباتك الحالية.'):null,
+      h('p',{},'عبارات صحيحة أدرجتها: '+hits+' من 4، وعبارات غير مدعومة أدرجتها: '+wrong+'.'),
+      h('div',{class:'row'},h('button',{type:'button',class:'btn',onclick:()=>api.finish(result)},'عرض النتيجة'))));
+  }
+  return t=>submit(!!t);
+}
+
+/* ---------- level 4: ransomware ---------- */
+function L4(root,api){
+  const P=[
+   {n:'الكشف والاحتواء',ev:'03:12 — ظهرت ملاحظة فدية على FILESRV-02 وملفات بامتداد .lockx. أبلغت 14 محطة عمل عن الأعراض نفسها، والعدد يتزايد.',
+    o:[{t:'عزل القطاعات المصابة وفصل الخادم عن الشبكة مع إبقاء الأجهزة قيد التشغيل',p:20,enc:0,down:2,fb:'الاحتواء أولًا أوقف الانتشار وحفظ الأدلة المتطايرة في الذاكرة.'},
+       {t:'إطفاء جميع الأجهزة المصابة بالقوة',p:10,enc:4,down:4,fb:'أوقف الانتشار لكنه أتلف أدلة الذاكرة، وربما مفاتيح تشفير ما زالت فيها.'},
+       {t:'إعادة تشغيل الخوادم المصابة وانتظار عودة الخدمة',p:0,enc:30,down:6,fb:'الانتشار استمر أثناء الانتظار، واحتُوي الحادث متأخرًا.'},
+       {t:'التفاوض مع المهاجمين أولًا لمعرفة المبلغ المطلوب',p:0,enc:35,down:8,fb:'ضاعت ساعات والإصابة تتوسع بلا احتواء.'}]},
+   {n:'تحديد النطاق',ev:'03:40 — تظهر في EDR عملية غير معتادة بدأت من محطة HR-07 بعد فتح مستند يحوي ماكرو، ثم اتصلت بعنوان خارجي.',
+    o:[{t:'فحص سجلات EDR وDNS لتحديد المريض صفر وكل جهاز اتصل بعنوان التحكم، وبناء قائمة مؤشرات اختراق',p:20,enc:0,down:1,fb:'تحديد النطاق بدقة يكشف الإصابات الصامتة التي لم تظهر عليها الفدية بعد.'},
+       {t:'فحص الأجهزة التي تعرض ملاحظة الفدية فقط',p:10,enc:6,down:2,fb:'فاتتك أجهزة مصابة لم تُشفَّر بعد، وستفاجئك لاحقًا.'},
+       {t:'افتراض أن الإصابة تقتصر على خادم الملفات والانتقال للاستعادة',p:0,enc:12,down:4,fb:'افتراض غير مدعوم، وبقيت أجهزة مصابة تعمل داخل الشبكة.'}]},
+   {n:'الاستئصال',ev:'05:10 — حُدد المريض صفر وعنوان التحكم وأدوات المهاجم. حان وقت إزالة التهديد من البيئة.',
+    o:[{t:'إعادة بناء الأجهزة المصابة من صور نظيفة، وتغيير كل كلمات المرور والمفاتيح، وإغلاق نقطة الدخول',p:20,enc:0,down:3,fb:'إعادة البناء تضمن عدم بقاء أبواب خلفية، وتدوير الأسرار يغلق عودة المهاجم.'},
+       {t:'تشغيل برنامج مكافحة فيروسات على الأجهزة وإعادتها للعمل',p:10,enc:4,down:2,fb:'قد تبقى أبواب خلفية لا يلتقطها الفحص.'},
+       {t:'حذف ملاحظات الفدية وملفات الامتداد فقط',p:0,enc:10,down:1,fb:'المظاهر زالت لكن المهاجم ما زال داخل الشبكة.'}]},
+   {n:'الاستعادة',ev:'08:30 — البيئة نظيفة. تملك نسخًا احتياطية معزولة بعضها أقدم من غيره. ما خطتك للاستعادة؟',
+    o:[{t:'التحقق من سلامة النسخ المعزولة أولًا، ثم الاستعادة بالترتيب حسب أولوية الأعمال',p:20,enc:0,down:4,fb:'التحقق يمنع إعادة الإصابة، والترتيب يعيد الخدمات الأهم أولًا.'},
+       {t:'استعادة كل الأنظمة دفعة واحدة من أحدث نسخة دون فحص',p:10,enc:4,down:3,fb:'سريعة لكنها قد تعيد إدخال البرمجية إن كانت النسخة ملوثة.'},
+       {t:'دفع الفدية للحصول على مفتاح فك التشفير',p:0,enc:0,down:6,fb:'لا ضمان لفك التشفير، ويموّل المهاجمين ويجعلك هدفًا متكررًا.'}]},
+   {n:'الإبلاغ والتواصل',ev:'10:00 — عادت الخدمات الحرجة. الإدارة تسأل عما يجب قوله ولمن.',
+    o:[{t:'إبلاغ الإدارة العليا والشؤون القانونية، وإشعار الجهات التنظيمية والمتضررين ضمن المهلة النظامية، مع بيان موحّد',p:20,enc:0,down:0,fb:'إبلاغ منظم ضمن المهل يقلل المخاطر القانونية ويحفظ الثقة.'},
+       {t:'إبلاغ الإدارة فقط وتأجيل أي إعلان',p:10,enc:0,down:0,fb:'مهل الإشعار النظامية قد تنقضي بينما تنتظر.'},
+       {t:'إخفاء الحادث وعدم إبلاغ أحد',p:0,enc:0,down:0,fb:'إخفاء الحادث مخالفة نظامية ويضاعف الضرر حين ينكشف.'}]}
+  ];
+  const TOTAL=120;
+  let k=0,enc=14,down=0,dec=0,fin=false,contained=false;const per=[];
+  const encV=h('b',{},''),fill=h('div',{class:'fill'}),downV=h('b',{},'0'),stV=h('span',{class:'chip bad'},'');
+  const meters=h('div',{class:'meters'},
+    h('div',{class:'meter'},h('small',{},'الأجهزة المشفّرة'),encV,h('div',{class:'track'},fill)),
+    h('div',{class:'meter'},h('small',{},'التعطل التشغيلي (ساعات)'),downV),
+    h('div',{class:'meter'},h('small',{},'حالة الانتشار'),stV));
+  const area=h('div',{class:'col'});
+  root.append(meters,area);
+  const upd=()=>{
+    encV.textContent=enc+' / '+TOTAL;fill.style.width=(enc/TOTAL*100)+'%';downV.textContent=String(down);
+    stV.className='chip '+(contained?'ok':'bad');stV.textContent=contained?'تم احتواء الانتشار':'الانتشار مستمر';
+  };
+  upd();
+  const iv=setInterval(()=>{if(!contained&&!fin){enc=Math.min(TOTAL,enc+3);upd()}},2000);
+  api.cleanup(()=>clearInterval(iv));
+  function step(){
+    const ph=P[k];
+    api.setProgress('المرحلة '+(k+1)+' من '+P.length+' — '+ph.n);
+    const fb=h('div',{});
+    const bs=shuffle(ph.o).map(o=>h('button',{type:'button',class:'opt',onclick:ev=>{
+      if(fin||per[k]!=null)return;
+      per[k]=o.p;dec+=o.p;enc=Math.min(TOTAL,enc+o.enc);down+=o.down;
+      if(k===0)contained=true;
+      upd();
+      bs.forEach(b=>{b.disabled=true});
+      ev.currentTarget.classList.add(o.p===20?'hit':o.p===10?'mid':'miss');
+      const last=k===P.length-1;
+      fb.replaceChildren(h('div',{class:'fb '+(o.p===20?'good':o.p===10?'mid':'bad')},
+        h('p',{},o.fb),
+        h('div',{class:'row'},h('button',{type:'button',class:'btn',onclick:()=>{if(last)done();else{k++;step()}}},last?'إنهاء الحادث':'المرحلة التالية'))));
+    }},o.t));
+    area.replaceChildren(h('section',{class:'card'},
+      h('p',{class:'kicker'},'المرحلة '+(k+1)+' من '+P.length),
+      h('h2',{},ph.n),
+      h('div',{class:'event'},ph.ev),
+      h('div',{class:'opts'},bs),fb));
+  }
+  function done(){
+    if(fin)return;fin=true;clearInterval(iv);
+    const acc=Math.round(0.8*dec+0.2*Math.max(0,100-enc/TOTAL*100));
+    api.finish({acc:acc,note:'أجهزة مشفّرة '+enc+' من '+TOTAL+' · تعطل '+down+' ساعة',
+      rows:P.map((p,j)=>({label:'المرحلة '+(j+1)+': '+p.n,pts:per[j]||0,max:20}))});
+  }
+  step();
+  return ()=>done();
+}
+
+/* ---------- level 5: full SOC crisis ---------- */
+function L5(root,api){
+  const S=[
+   {time:'22:40',title:'إنذار مبكر',
+    inject:'ربط نظام SIEM بين تسجيلات دخول ناجحة لحساب مدير النظام adm.rashid من بلدين مختلفين خلال 10 دقائق، ورصد أمر PowerShell مشفّر على DC-01.',
+    good:'تحوّل التنبيه إلى حادث مُدار: الأدلة محفوظة والفريق منظّم.',mid:'تم احتواء جزئي لكن بقيت ثغرات في الأدلة أو التنظيم.',bad:'أُهدرت ساعات حرجة والمهاجم يتحرك بحرية.',
+    roles:[
+     {r:'محلل الرصد',q:'كيف تصنّف التنبيه وما إجراؤك؟',o:[
+       {t:'أصنّفه حرجًا، وأنهي جلسات الحساب وأصعّد للقائد',p:2,fb:'حساب إداري بنشاط غير معتاد يستدعي التصعيد الفوري.'},
+       {t:'أعتبره إنذارًا كاذبًا بسبب استخدام VPN',p:0,fb:'بلدان مختلفان في 10 دقائق مؤشر خطر لا عذر له.'},
+       {t:'أفتح بلاغًا منخفض الأولوية للمتابعة غدًا',p:1,fb:'تأخير غير مبرر لحساب بصلاحيات عالية.'}]},
+     {r:'خبير الأدلة',q:'ما أول ما تفعله على DC-01؟',o:[
+       {t:'ألتقط صورة للذاكرة وأصدّر السجلات مع تسجيل التجزئة',p:2,fb:'حفظ الأدلة المتطايرة قبل أي تغيير.'},
+       {t:'أعيد تشغيل الخادم لإيقاف الأمر',p:0,fb:'إعادة التشغيل تمحو الذاكرة وأثر المهاجم.'},
+       {t:'ألتقط لقطة شاشة للتنبيه فقط',p:1,fb:'غير كافٍ كدليل جنائي.'}]},
+     {r:'قائد الحادث',q:'ما قرارك التنظيمي؟',o:[
+       {t:'أفعّل خطة الاستجابة، وأحدد الخطورة «عالية»، وأفتح غرفة العمليات وأوزّع الأدوار',p:2,fb:'تنظيم مبكر يسرّع كل ما بعده.'},
+       {t:'أنتظر الصباح لمزيد من الأدلة',p:0,fb:'الانتظار يمنح المهاجم ساعات إضافية.'},
+       {t:'أرسل تفاصيل الحادث لجميع الموظفين فورًا',p:1,fb:'نشر التفاصيل مبكرًا يربك ولا يفيد.'}]},
+     {r:'الاتصال والشؤون القانونية',q:'ما الذي تحضّره الآن؟',o:[
+       {t:'أجهّز بيانًا داخليًا مبدئيًا وقائمة بمن يحق له الاطلاع، دون نشر',p:2,fb:'تحضير هادئ يوفر الوقت لاحقًا.'},
+       {t:'أنشر طمأنة على وسائل التواصل',p:0,fb:'إعلان قبل معرفة الحقائق يضر السمعة.'},
+       {t:'لا أفعل شيئًا حتى يتأكد الاختراق',p:1,fb:'التحضير المبكر لا يكلّف شيئًا.'}]}]},
+   {time:'23:55',title:'حركة جانبية وتسريب',
+    inject:'حركة صادرة بحجم 3.2 GB من FILESRV-02 إلى تخزين سحابي غير معروف، وظهور حسابي خدمة جديدين لم يُنشئهما أحد.',
+    good:'أُوقف التسريب وأصبح نطاق الأضرار معروفًا ومحدودًا.',mid:'توقف جزء من التسريب لكن نطاق الأضرار ما زال غامضًا.',bad:'استمر التسريب وتعمّقت الإصابة.',
+    roles:[
+     {r:'محلل الرصد',q:'ما إجراؤك على الشبكة؟',o:[
+       {t:'أحجب وجهة التسريب وأبحث عن الحسابات الجديدة في كامل الدليل',p:2,fb:'تقطع التسريب وتغلق أبواب العودة.'},
+       {t:'أحجب العنوان فقط وأتجاهل الحسابات',p:1,fb:'الحسابات الجديدة بوابة عودة للمهاجم.'},
+       {t:'أنتظر فريق منع فقدان البيانات',p:0,fb:'التسريب مستمر الآن.'}]},
+     {r:'خبير الأدلة',q:'كيف تتعامل مع حسابي الخدمة؟',o:[
+       {t:'أعطّلهما، وأسجّل المعرّفات وأوقات الإنشاء وأجمع سجلات الإنشاء',p:2,fb:'تعطيل مع حفظ الأثر.'},
+       {t:'أجمع السجلات دون أي إجراء على الحسابين',p:1,fb:'الأدلة محفوظة لكن الحسابين يبقيان نشطين.'},
+       {t:'أحذف الحسابين فورًا',p:0,fb:'الحذف يطمس الأثر ويمنع تتبع النشاط.'}]},
+     {r:'قائد الحادث',q:'ما قرارك بشأن الأنظمة؟',o:[
+       {t:'أعزل قطاع خادم الملفات، وأقبل تعطيلًا محدودًا، وأبلغ الإدارة',p:2,fb:'عزل موجّه بأقل كلفة تشغيلية.'},
+       {t:'أعزل الشبكة بأكملها',p:1,fb:'مبالغ فيه: يوقف الأعمال دون حاجة.'},
+       {t:'أُبقي كل شيء يعمل لتجنب التعطيل',p:0,fb:'التسريب يستمر بلا رادع.'}]},
+     {r:'الاتصال والشؤون القانونية',q:'ما أولويتك القانونية؟',o:[
+       {t:'أقيّم نوع البيانات المسرّبة، وأبدأ احتساب مهلة الإشعار النظامي، وأتواصل مع شركة التأمين',p:2,fb:'المهل تبدأ من العلم بالحادث.'},
+       {t:'أنتظر التقرير النهائي',p:1,fb:'مهل الإشعار لا تنتظر نهاية التحقيق.'},
+       {t:'أبلغ العملاء بأن كل بياناتهم سُرّبت',p:0,fb:'ادعاء غير مثبت يسبب ذعرًا وإشكالات قانونية.'}]}]},
+   {time:'02:30',title:'الفدية',
+    inject:'بدأ تشفير 40 محطة عمل، وظهرت ملاحظة فدية تمهل 72 ساعة.',
+    good:'احتُوي التشفير مبكرًا وخطة التعافي واضحة ومنسّقة.',mid:'توقف الانتشار لكن التعافي أو الرسائل بحاجة إلى تنسيق.',bad:'اتسع نطاق التشفير وتشتت الفريق.',
+    roles:[
+     {r:'محلل الرصد',q:'كيف توقف الانتشار؟',o:[
+       {t:'أفعّل عزل EDR للمجموعات المصابة وأعمّم حظر المؤشرات على كل الأجهزة',p:2,fb:'عزل جماعي سريع يوقف الانتشار.'},
+       {t:'أفحص الأجهزة واحدًا واحدًا يدويًا',p:1,fb:'بطيء جدًا أمام انتشار سريع.'},
+       {t:'أتجاهل المحطات وأركز على الخوادم',p:0,fb:'المحطات هي الجسر لبقية الشبكة.'}]},
+     {r:'خبير الأدلة',q:'ماذا تفعل بعينة البرمجية؟',o:[
+       {t:'أحفظ العينة وملاحظة الفدية، وأستخرج المؤشرات، وأحدد العائلة',p:2,fb:'تحديد العائلة يكشف إن كانت هناك أدوات فك تشفير.'},
+       {t:'أسجل نص الملاحظة فقط',p:1,fb:'ناقص: العينة تفيد في التحليل.'},
+       {t:'أشغّل العينة على جهاز إنتاج لاختبارها',p:0,fb:'تشغيل البرمجية على بيئة حية يوسّع الضرر.'}]},
+     {r:'قائد الحادث',q:'ما خطتك للتعافي؟',o:[
+       {t:'أتحقق من النسخ المعزولة، وأبدأ استعادة مرحلية حسب أولوية الأعمال، وأجعل قرار الدفع للإدارة والقانون معًا',p:2,fb:'تعافٍ منظم وقرار الدفع بيد من يملكه.'},
+       {t:'أؤجل التعافي حتى ينتهي التحقيق كله',p:1,fb:'يمكن التوازي بين التحقيق والتعافي بعد الاحتواء.'},
+       {t:'أدفع الفدية فورًا لاختصار الوقت',p:0,fb:'لا ضمان لفك التشفير، ويشجّع المهاجمين.'}]},
+     {r:'الاتصال والشؤون القانونية',q:'كيف تدير الرسائل؟',o:[
+       {t:'بيان موحد بمتحدث واحد للموظفين والعملاء والجهات التنظيمية',p:2,fb:'رسالة واحدة تحفظ الثقة وتمنع التضارب.'},
+       {t:'أبلغ الموظفين فقط',p:1,fb:'يترك العملاء والجهات الرقابية بلا إشعار.'},
+       {t:'كل إدارة ترد على جمهورها بطريقتها',p:0,fb:'رسائل متضاربة تضعف الثقة.'}]}]}
+  ];
+  let s=0,pts=0,ans=0,stagePts=0,finished=false;const per=[];
+  const feed=h('ul',{class:'feed'}),area=h('div',{class:'col'});
+  const log=(t,x)=>feed.prepend(h('li',{},h('span',{class:'mono muted'},t),' ',x));
+  root.append(area,h('section',{class:'card'},h('h3',{},'سجل غرفة العمليات'),feed));
+  function stage(){
+    const st=S[s];ans=0;stagePts=0;
+    api.setProgress('المرحلة '+(s+1)+' من '+S.length+' — لكل دور قراره، وعليك أن تقرر الأدوار الأربعة');
+    log(st.time,'حدث جديد: '+st.inject);
+    const next=h('div',{class:'row'});
+    const card=r=>{
+      let done=false;const fb=h('p',{class:'small muted'},'');
+      const bs=shuffle(r.o).map(o=>h('button',{type:'button',class:'opt',onclick:ev=>{
+        if(done)return;done=true;
+        bs.forEach(b=>{b.disabled=true});
+        ev.currentTarget.classList.add(o.p===2?'hit':o.p===1?'mid':'miss');
+        fb.textContent=o.fb;stagePts+=o.p;pts+=o.p;ans++;
+        log(st.time,r.r+' سجّل قراره.');
+        if(ans===4)endStage();
+      }},o.t));
+      return h('div',{class:'role'},h('h3',{},r.r),h('p',{class:'small'},r.q),h('div',{class:'opts'},bs),fb);
+    };
+    function endStage(){
+      per[s]=stagePts;
+      const tone=stagePts>=7?'good':stagePts>=4?'mid':'bad';
+      log(st.time,'النتيجة: '+st[tone]);
+      const last=s===S.length-1;
+      next.replaceChildren(h('div',{class:'fb '+tone},h('b',{},'ملخص المرحلة ('+stagePts+' / 8): '+st[tone]),
+        h('div',{class:'row'},h('button',{type:'button',class:'btn',onclick:()=>{if(last)done();else{s++;stage()}}},last?'إنهاء الأزمة':'المرحلة التالية'))));
+    }
+    area.replaceChildren(
+      h('section',{class:'card'},h('p',{class:'kicker mono'},st.time),h('h2',{},st.title),h('div',{class:'event'},st.inject)),
+      h('div',{class:'roles'},st.roles.map(card)),next);
+  }
+  function done(){
+    if(finished)return;finished=true;
+    api.finish({acc:Math.round(pts/(S.length*8)*100),rows:S.map((st,j)=>({label:'المرحلة '+(j+1)+': '+st.title,pts:per[j]||0,max:8}))});
+  }
+  stage();
+  return ()=>done();
+}
+
+const THEME_KEY='incident-arena-theme';
+function applyTheme(t){
+  document.documentElement.setAttribute('data-theme',t);
+  $('#themeBtn').textContent=t==='dark'?'الوضع الفاتح':'الوضع الداكن';
+}
+let theme='dark';
+try{theme=localStorage.getItem(THEME_KEY)==='light'?'light':'dark'}catch(e){}
+applyTheme(theme);
+$('#themeBtn').addEventListener('click',()=>{
+  theme=theme==='dark'?'light':'dark';applyTheme(theme);
+  try{localStorage.setItem(THEME_KEY,theme)}catch(e){}
+});
+
+home();
+})();
+</script>
+</body>
+</html>
